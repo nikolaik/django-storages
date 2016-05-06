@@ -49,6 +49,7 @@ from __future__ import print_function
 
 
 import getpass
+import logging
 import os
 import paramiko
 import posixpath
@@ -59,6 +60,8 @@ from django.conf import settings
 from django.core.files.base import File
 
 from storages.compat import urlparse, BytesIO, Storage
+
+logger = logging.getLogger(__name__)
 
 
 class SFTPStorage(Storage):
@@ -121,8 +124,18 @@ class SFTPStorage(Storage):
     @property
     def sftp(self):
         """Lazy SFTP connection"""
+
+        # Check if connection is still alive and if not, drop it.
+        if hasattr(self, '_sftp'):
+            try:
+                self._sftp.getcwd()
+            except paramiko.SSHException as e:
+                del self._sftp
+                logger.info('Could not getcwd %s', str(e))
+
         if not hasattr(self, '_sftp'):
             self._connect()
+
         return self._sftp
 
     def _join(self, *args):
