@@ -46,6 +46,11 @@ from __future__ import print_function
 # files on the remote host.  You have to be a member of the group to set this.
 # SFTP_KNOWN_HOST_FILE (Optional) - absolute path of know host file, if it isn't
 # set "~/.ssh/known_hosts" will be used
+#
+# SFTP_STORAGE_CONNECTION_SANITY (Optional) - A boolean indicating whether to
+# run a dummy stat command for every sftp command and catching SSH connection
+# errors.
+# Warning: This increases the overhead of protocol by 2x.
 
 
 import getpass
@@ -85,6 +90,8 @@ class SFTPStorage(Storage):
 
         self._root_path = settings.SFTP_STORAGE_ROOT
         self._base_url = settings.MEDIA_URL
+
+        self._connection_sanity = getattr(settings, 'SFTP_STORAGE_CONNECTION_SANITY', False)
 
         # for now it's all posix paths.  Maybe someday we'll support figuring
         # out if the remote host is windows.
@@ -126,7 +133,7 @@ class SFTPStorage(Storage):
         """Lazy SFTP connection"""
 
         # Check if connection is still alive and if not, drop it.
-        if hasattr(self, '_sftp'):
+        if hasattr(self, '_sftp') and self._connection_sanity:
             try:
                 self._sftp.stat('.')  # poke current directory
             except paramiko.SSHException as e:
