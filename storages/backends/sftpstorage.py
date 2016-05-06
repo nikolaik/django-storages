@@ -128,7 +128,7 @@ class SFTPStorage(Storage):
         # Check if connection is still alive and if not, drop it.
         if hasattr(self, '_sftp'):
             try:
-                self._sftp.getcwd()
+                self._sftp.stat('.')  # poke current directory
             except paramiko.SSHException as e:
                 del self._sftp
                 logger.info('Could not getcwd %s', str(e))
