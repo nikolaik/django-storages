@@ -56,6 +56,8 @@ from __future__ import print_function
 import getpass
 import logging
 import os
+from threading import Lock
+
 import paramiko
 import posixpath
 import stat
@@ -97,6 +99,8 @@ class SFTPStorage(Storage):
         # out if the remote host is windows.
         self._pathmod = posixpath
 
+        self.lock = Lock()
+
     def _connect(self):
         self._ssh = paramiko.SSHClient()
 
@@ -133,15 +137,17 @@ class SFTPStorage(Storage):
         """Lazy SFTP connection"""
 
         # Check if connection is still alive and if not, drop it.
-        if hasattr(self, '_sftp') and self._connection_sanity:
-            try:
-                self._sftp.stat('.')  # poke current directory
-            except paramiko.SSHException as e:
-                del self._sftp
-                logger.info('Could not getcwd %s', str(e))
+        # Note: We lock here to prevent race conditions while reconnecting
+        with self.lock:
+            if hasattr(self, '_sftp') and self._connection_sanity:
+                try:
+                    self._sftp.stat('.')  # poke current directory
+                except paramiko.SSHException as e:
+                    del self._sftp
+                    logger.info('Could not getcwd %s', str(e))
 
-        if not hasattr(self, '_sftp'):
-            self._connect()
+            if not hasattr(self, '_sftp'):
+                self._connect()
 
         return self._sftp
 
